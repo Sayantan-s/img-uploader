@@ -7,6 +7,7 @@ import { FC, PropsWithChildren, useCallback, useState } from "react";
 import { DesktopContext } from "./context/DesktopContext";
 import { useDesktopCtx } from "./hooks/useDesktopCtx";
 import { DropUIStateProps, StateWrapperProps } from "./type";
+import { validator } from "./validations";
 
 const Root: FC<PropsWithChildren> = ({ children }) => {
   const { maxFileSize, acceptedFileTypes, onFilesAccept, onFilesReject } =
@@ -19,6 +20,7 @@ const Root: FC<PropsWithChildren> = ({ children }) => {
 
   const handleDrop = useCallback(
     (acceptedFiles: File[], fileRejections: FileRejection[]) => {
+      console.log("fileRejections", fileRejections);
       onFilesAccept(acceptedFiles);
       onFilesReject(
         fileRejections.map((fileRejection) => ({
@@ -35,22 +37,32 @@ const Root: FC<PropsWithChildren> = ({ children }) => {
       onDrop={handleDrop}
       accept={acceptedFileTypesObject}
       maxSize={maxFileSize}
+      validator={validator(acceptedFileTypes, maxFileSize)}
     >
-      {(state) => (
-        <DesktopContext.Provider value={state}>
-          <section>
-            <div
-              {...state.getRootProps({
-                className:
-                  "p-4 border border-dashed border-gray-300 rounded-md",
-              })}
-            >
-              <input {...state.getInputProps()} />
-              {children}
-            </div>
-          </section>
-        </DesktopContext.Provider>
-      )}
+      {(state) => {
+        console.log(state, "state");
+        return (
+          <DesktopContext.Provider value={state}>
+            <section>
+              <div
+                {...state.getRootProps({
+                  className:
+                    "p-4 border border-dashed border-gray-300 rounded-md",
+                })}
+              >
+                <input
+                  {...state.getInputProps({
+                    disabled: !!(
+                      state.acceptedFiles.length || state.fileRejections.length
+                    ),
+                  })}
+                />
+                {children}
+              </div>
+            </section>
+          </DesktopContext.Provider>
+        );
+      }}
     </Dropzone>
   );
 };
@@ -78,8 +90,8 @@ const DragActive: FC<DropUIStateProps> = (props) => {
 };
 
 const Accept: FC<DropUIStateProps> = (props) => {
-  const { acceptedFiles, fileRejections } = useDesktopCtx();
-  const show = !!acceptedFiles.length && !fileRejections.length;
+  const { acceptedFiles } = useDesktopCtx();
+  const show = !!acceptedFiles.length;
 
   return (
     <StateWrapper {...props} show={show}>
@@ -89,23 +101,21 @@ const Accept: FC<DropUIStateProps> = (props) => {
 };
 
 const Reject: FC<DropUIStateProps> = (props) => {
-  const { isDragReject } = useDesktopCtx();
+  const { acceptedFiles, fileRejections } = useDesktopCtx();
+  const show = !acceptedFiles.length && !!fileRejections.length;
+
   return (
-    <StateWrapper {...props} show={isDragReject}>
+    <StateWrapper {...props} show={show}>
       {props.children}
     </StateWrapper>
   );
 };
 
 const Default: FC<DropUIStateProps> = (props) => {
-  const { isDragActive, isFocused, acceptedFiles, fileRejections } =
-    useDesktopCtx();
+  const { isDragActive, acceptedFiles, fileRejections } = useDesktopCtx();
   const areFilesSubmitted = acceptedFiles.length || fileRejections.length;
   return (
-    <StateWrapper
-      {...props}
-      show={!isDragActive && !isFocused && !areFilesSubmitted}
-    >
+    <StateWrapper {...props} show={!areFilesSubmitted && !isDragActive}>
       {props.children}
     </StateWrapper>
   );
